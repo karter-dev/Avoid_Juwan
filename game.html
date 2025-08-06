@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Avoid Game</title>
+  <style>
+    /* 기본 스타일, 게임 화면 및 버튼 등 */
+    body {
+      background: #111; color: #eee;
+      font-family: Arial, sans-serif;
+      display: flex; flex-direction: column; align-items: center;
+      margin: 0; padding: 0;
+    }
+    #game-container {
+      position: relative;
+      width: 95vw; max-width: 500px;
+      aspect-ratio: 3/5;
+      background: #222;
+      border: 3px solid #9dd814;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+    #player {
+      position: absolute;
+      width: 20%;
+      aspect-ratio: 1/1;
+      bottom: 5%;
+      left: 40%;
+    }
+    #player img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .poop {
+      position: absolute;
+      width: 16%;
+      aspect-ratio: 1/1;
+      top: 0;
+    }
+    .poop img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    #gameover {
+      position: absolute;
+      width: 100%;
+      top: 45%;
+      text-align: center;
+      font-size: 2rem;
+      color: red;
+      display: none;
+      z-index: 10;
+    }
+    #scoreboard {
+      margin-top: 10px;
+      color: #9dd814;
+      width: 95vw; max-width: 500px;
+      display: flex; justify-content: space-between;
+      font-size: 1.2rem;
+    }
+    #leaderboard {
+      margin-top: 20px;
+      width: 95vw; max-width: 500px;
+      background: #222;
+      border: 2px solid #9dd814;
+      padding: 10px;
+      color: #9dd814;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 1rem;
+    }
+    button {
+      margin-top: 10px;
+      padding: 10px 20px;
+      font-size: 1.1rem;
+      background: #444;
+      color: #9dd814;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    button:active {
+      background: #666;
+    }
+  </style>
+</head>
+<body>
+  <h1>게이 주완을 피해라!</h1>
+  <div id="scoreboard">
+    <div>현재 점수: <span id="score">0</span></div>
+    <div>베스트 점수: <span id="best-score">0</span></div>
+  </div>
+
+  <div id="game-container">
+    <div id="player"><img src="player.png" alt="Player" /></div>
+    <div id="gameover">
+      💀 Your Gay.. 💀<br/>
+      <button id="retryBtn" style="display:none;">다시하기</button><br/>
+      <button id="submitScoreBtn" style="display:none;">랭킹에 올리기</button>
+    </div>
+  </div>
+
+  <div id="leaderboard">
+    <h3>랭킹 보드 (TOP 10)</h3>
+    <ul id="rankingsList"></ul>
+  </div>
+
+  <button id="startBtn">게임 시작</button>
+
+  <script>
+    const userId = localStorage.getItem("user_id");
+    if (!userId) {
+      alert("로그인부터 해주세요!");
+      window.location.href = "login.html";
+    }
+
+    const gameContainer = document.getElementById("game-container");
+    const player = document.getElementById("player");
+    const gameOverDiv = document.getElementById("gameover");
+    const scoreSpan = document.getElementById("score");
+    const bestScoreSpan = document.getElementById("best-score");
+    const retryBtn = document.getElementById("retryBtn");
+    const submitScoreBtn = document.getElementById("submitScoreBtn");
+    const startBtn = document.getElementById("startBtn");
+    const rankingsList = document.getElementById("rankingsList");
+
+    let isGameOver = false;
+    let score = 0;
+    let bestScore = 0;
+    let playerX = gameContainer.clientWidth * 0.4;
+
+    function updatePlayerPosition() {
+      player.style.left = playerX + "px";
+    }
+
+    // 히트박스 축소 함수
+    function shrinkRect(rect, factor) {
+      return {
+        left: rect.left + rect.width * factor / 2,
+        right: rect.right - rect.width * factor / 2,
+        top: rect.top + rect.height * factor / 2,
+        bottom: rect.bottom - rect.height * factor / 2
+      };
+    }
+
+    // 점수 갱신 UI
+    function updateScoreUI() {
+      scoreSpan.textContent = score;
+      bestScoreSpan.textContent = bestScore;
+    }
+
+    // 플레이어 이동
+    document.addEventListener("keydown", (e) => {
+      if (isGameOver) return;
+      const moveAmount = gameContainer.clientWidth * 0.06;
+      if (e.key === "ArrowLeft" && playerX > 0) {
+        playerX -= moveAmount;
+      } else if (e.key === "ArrowRight" && playerX < gameContainer.clientWidth - player.offsetWidth) {
+        playerX += moveAmount;
+      }
+      updatePlayerPosition();
+    });
+
+    // 게임 시작 함수
+    function startGame() {
+      isGameOver = false;
+      score = 0;
+      updateScoreUI();
+      gameOverDiv.style.display = "none";
+      retryBtn.style.display = "none";
+      submitScoreBtn.style.display = "none";
+      startBtn.style.display = "none";
+      playerX = gameContainer.clientWidth * 0.4;
+      updatePlayerPosition();
+
+      startDropping();
+    }
+
+    // 게임 종료 함수
+    function gameOver() {
+      isGameOver = true;
+      gameOverDiv.style.display = "block";
+      retryBtn.style.display = "inline-block";
+      submitScoreBtn.style.display = "inline-block";
+
+      if (score > bestScore) {
+        bestScore = score;
+        updateScoreUI();
+      }
+    }
+
+    // 점수 제출 함수
+    async function submitScore() {
+      try {
+        const res = await fetch("http://localhost:8000/submit_score", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ user_id: userId, score })
+        });
+        const data = await res.json();
+        alert(`랭킹에 등록되었습니다! 베스트 점수: ${data.best_score}`);
+        loadRankings();
+      } catch (e) {
+        alert("서버 통신 실패");
+        console.error(e);
+      }
+    }
+
+    // 랭킹 불러오기
+   async function loadRankings() {
+      try {
+        const res = await fetch("http://localhost:8000/get_rankings");
+        const data = await res.json();
+        rankingsList.innerHTML = "";
+        data.rankings.forEach(({ user_id, score }, idx) => {
+          const li = document.createElement("li");
+          li.textContent = `${idx + 1}. ${user_id} : ${score}`;
+          rankingsList.appendChild(li);
+        });
+      } catch (e) {
+        rankingsList.innerHTML = "<li>랭킹 로드 실패</li>";
+        console.error(e);
+      }
+    }
+
+
+    // 똥 떨어뜨리기 (간단히 1개만, 난이도 조절 안함)
+    function startDropping() {
+      let poopInterval = setInterval(() => {
+        if (isGameOver) {
+          clearInterval(poopInterval);
+          return;
+        }
+        createPoop();
+      }, 1000);
+    }
+
+    function createPoop() {
+      if (isGameOver) return;
+      const poop = document.createElement("div");
+      poop.classList.add("poop");
+      const poopImg = document.createElement("img");
+      poopImg.src = "poop.png";
+      poopImg.alt = "Poop";
+      poop.appendChild(poopImg);
+      poop.style.left = Math.random() * (gameContainer.clientWidth - gameContainer.clientWidth * 0.16) + "px";
+      gameContainer.appendChild(poop);
+
+      let poopY = 0;
+      const fall = setInterval(() => {
+        if (isGameOver) {
+          clearInterval(fall);
+          poop.remove();
+          return;
+        }
+        poopY += gameContainer.clientHeight * 0.012;
+        poop.style.top = poopY + "px";
+
+        const playerRect = player.getBoundingClientRect();
+        const poopRect = poop.getBoundingClientRect();
+
+        // 히트박스 축소
+        const p = shrinkRect(playerRect, 0.4);
+        const d = shrinkRect(poopRect, 0.2);
+
+        if (
+          d.bottom >= p.top &&
+          d.top <= p.bottom &&
+          d.right >= p.left &&
+          d.left <= p.right
+        ) {
+          gameOver();
+          clearInterval(fall);
+        }
+        if (poopY > gameContainer.clientHeight) {
+          poop.remove();
+          clearInterval(fall);
+          if (!isGameOver) {
+            score++;
+            updateScoreUI();
+          }
+        }
+      }, 20);
+    }
+
+    retryBtn.onclick = () => {
+      startGame();
+    };
+
+    submitScoreBtn.onclick = () => {
+      submitScore();
+    };
+
+    startBtn.onclick = () => {
+      startGame();
+      loadRankings();
+    };
+
+    // 처음에 베스트 스코어 가져오기
+    window.onload = () => {
+      loadRankings();
+    };
+
+    updatePlayerPosition();
+  </script>
+</body>
+</html>

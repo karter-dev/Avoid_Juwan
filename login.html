@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login</title>
+  <style>
+    body {
+      background: #111; color: #eee;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100vh; margin: 0;
+      font-family: Arial, sans-serif;
+    }
+    input, button {
+      font-size: 1.2rem; padding: 0.5em 1em; margin: 0.5em 0;
+      border-radius: 6px; border: none;
+    }
+    input {
+      width: 250px;
+    }
+    button {
+      background: #4caf50; color: white; cursor: pointer;
+    }
+    button:hover {
+      background: #45a049;
+    }
+  </style>
+</head>
+<body>
+  <h1>로그인</h1>
+  <input id="userid" placeholder="아이디 입력" autocomplete="off" />
+  <button onclick="login()">로그인</button>
+
+  <script>
+    function login() {
+      const id = document.getElementById("userid").value.trim();
+      if (!id) {
+        alert("아이디를 입력해주세요");
+        return;
+      }
+      // 로컬 스토리지에 저장 후 게임 페이지로 이동
+      localStorage.setItem("user_id", id);
+      window.location.href = "game.html";
+    }
+  </script>
+</body>
+</html>
